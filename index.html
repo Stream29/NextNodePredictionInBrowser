@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Transformer in Browser: Predict Next Node in Dify Workflow</title>
+    <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.17.0/dist/ort.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'JetBrains Mono', 'SF Mono', 'Monaco', 'Inconsolata', monospace;
+            background: #0a0a0a;
+            color: #e0e0e0;
+            min-height: 100vh;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            border-bottom: 1px solid #333;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+        }
+        
+        h1 {
+            font-size: 24px;
+            color: #00ff41;
+            font-weight: normal;
+            margin-bottom: 5px;
+        }
+        
+        .subtitle {
+            color: #888;
+            font-size: 14px;
+        }
+        
+        .status {
+            padding: 10px 0;
+            margin: 20px 0;
+            font-size: 14px;
+            border-left: 3px solid #333;
+            padding-left: 15px;
+        }
+        
+        .status.loading {
+            border-color: #ffaa00;
+            color: #ffaa00;
+        }
+        
+        .status.ready {
+            border-color: #00ff41;
+            color: #00ff41;
+        }
+        
+        .status.error {
+            border-color: #ff4444;
+            color: #ff4444;
+        }
+        
+        .section {
+            margin: 30px 0;
+            border: 1px solid #333;
+            background: #111;
+        }
+        
+        .section-header {
+            background: #1a1a1a;
+            padding: 10px 15px;
+            border-bottom: 1px solid #333;
+            font-size: 14px;
+            color: #ccc;
+        }
+        
+        .section-content {
+            padding: 20px 15px;
+        }
+        
+        .input-row {
+            margin: 15px 0;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #ccc;
+            font-size: 13px;
+        }
+        
+        select, input[type="text"] {
+            width: 100%;
+            padding: 8px 12px;
+            background: #1a1a1a;
+            border: 1px solid #333;
+            color: #e0e0e0;
+            font-family: inherit;
+            font-size: 14px;
+        }
+        
+        select:focus, input[type="text"]:focus {
+            outline: none;
+            border-color: #00ff41;
+        }
+        
+        button {
+            background: #1a1a1a;
+            border: 1px solid #333;
+            color: #e0e0e0;
+            padding: 10px 20px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 14px;
+            margin: 10px 0;
+        }
+        
+        button:hover {
+            border-color: #00ff41;
+            background: #0f2419;
+        }
+        
+        button:disabled {
+            color: #555;
+            cursor: not-allowed;
+        }
+        
+        button:disabled:hover {
+            border-color: #333;
+            background: #1a1a1a;
+        }
+        
+        .sequence {
+            font-family: inherit;
+            background: #0d0d0d;
+            padding: 15px;
+            margin: 15px 0;
+            border: 1px solid #333;
+            color: #00ff41;
+            font-size: 16px;
+            text-align: center;
+        }
+        
+        .results {
+            margin-top: 20px;
+        }
+        
+        .prediction {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid #222;
+            font-size: 14px;
+        }
+        
+        .prediction:last-child {
+            border-bottom: none;
+        }
+        
+        .prediction-token {
+            color: #00ff41;
+            font-weight: bold;
+        }
+        
+        .prediction-prob {
+            color: #ccc;
+        }
+        
+        .prediction-bar {
+            flex: 1;
+            margin: 0 15px;
+            height: 4px;
+            background: #333;
+        }
+        
+        .prediction-fill {
+            height: 100%;
+            background: #00ff41;
+            transition: width 0.3s;
+        }
+        
+        .purpose {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #333;
+            background: #111;
+        }
+        
+        .purpose-text {
+            color: #ccc;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+        
+        .timing {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #333;
+            font-size: 13px;
+            color: #888;
+        }
+        
+        @media (max-width: 600px) {
+            .container {
+                padding: 0 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>DIFY WORKFLOW PREDICTOR</h1>
+            <div class="subtitle">Transformer AI predicts next node in Dify workflow sequences</div>
+        </div>
+        
+        <div id="status" class="status loading">
+            [LOADING] Initializing model...
+        </div>
+        
+        <div class="purpose">
+            <div class="purpose-text">
+                This transformer model predicts the next node in Dify workflow sequences.<br>
+                Trained on Dify DSLs from <a href="https://github.com/svcvit/Awesome-Dify-Workflow" target="_blank">https://github.com/svcvit/Awesome-Dify-Workflow</a>
+            </div>
+        </div>
+        
+        <div class="section">
+            <div class="section-header">SEQUENCE INPUT</div>
+            <div class="section-content">
+                <div class="input-row">
+                    <label>Select Dify workflow sequence:</label>
+                    <select id="sequenceSelect">
+                        <option value="start,llm">start → llm</option>
+                        <option value="start,agent">start → agent</option>
+                        <option value="start,llm,variable">start → llm → variable</option>
+                        <option value="start,agent,answer">start → agent → answer</option>
+                        <option value="llm,variable,code">llm → variable → code</option>
+                    </select>
+                </div>
+                
+                <div class="input-row">
+                    <label>Or input custom workflow nodes:</label>
+                    <input type="text" id="customSequence" placeholder="start,llm,variable">
+                </div>
+                
+                <div class="sequence" id="sequenceDisplay"></div>
+                
+                <button id="predictButton" onclick="predict()">RUN INFERENCE</button>
+            </div>
+        </div>
+        
+        <div id="resultsSection" class="section" style="display: none;">
+            <div class="section-header">NEXT NODE PREDICTIONS</div>
+            <div class="section-content">
+                <div id="predictions" class="results"></div>
+                <div id="inferenceTime" class="timing"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let session = null;
+        let vocab = null;
+        let idToToken = null;
+        
+        async function loadModel() {
+            try {
+                const vocabResponse = await fetch('vocab.json');
+                const vocabData = await vocabResponse.json();
+                vocab = vocabData.vocab;
+                idToToken = vocabData.id_to_token;
+                
+                session = await ort.InferenceSession.create('transformer_model.onnx');
+                
+                document.getElementById('status').textContent = '[READY] Model loaded successfully';
+                document.getElementById('status').className = 'status ready';
+                document.getElementById('predictButton').disabled = false;
+                
+                updateSequenceDisplay();
+                
+            } catch (error) {
+                console.error('Model loading failed:', error);
+                document.getElementById('status').textContent = '[ERROR] Failed to load model - use HTTP server';
+                document.getElementById('status').className = 'status error';
+            }
+        }
+        
+        function updateSequenceDisplay() {
+            const select = document.getElementById('sequenceSelect');
+            const custom = document.getElementById('customSequence');
+            const display = document.getElementById('sequenceDisplay');
+            
+            let sequence = custom.value.trim() || select.value;
+            let tokens = sequence.split(',').map(t => t.trim()).filter(t => t);
+            
+            if (tokens.length === 0) {
+                display.textContent = 'No sequence selected';
+                return;
+            }
+            
+            display.textContent = tokens.join(' → ') + ' → [?]';
+        }
+        
+        document.getElementById('sequenceSelect').addEventListener('change', function() {
+            document.getElementById('customSequence').value = '';
+            updateSequenceDisplay();
+        });
+        
+        document.getElementById('customSequence').addEventListener('input', updateSequenceDisplay);
+        
+        async function predict() {
+            if (!session || !vocab) return;
+            
+            const select = document.getElementById('sequenceSelect');
+            const custom = document.getElementById('customSequence');
+            const resultsSection = document.getElementById('resultsSection');
+            const predictionsDiv = document.getElementById('predictions');
+            const timeDiv = document.getElementById('inferenceTime');
+            
+            let sequenceText = custom.value.trim() || select.value;
+            let tokens = sequenceText.split(',').map(t => t.trim()).filter(t => t);
+            
+            if (tokens.length === 0) return;
+            
+            try {
+                document.getElementById('predictButton').textContent = 'PROCESSING...';
+                document.getElementById('predictButton').disabled = true;
+                
+                const startTime = performance.now();
+                
+                let inputIds = tokens.map(token => vocab[token] || vocab['<UNK>']);
+                while (inputIds.length < 8) {
+                    inputIds.push(vocab['<PAD>']);
+                }
+                inputIds = inputIds.slice(0, 8);
+                
+                const inputArray = new BigInt64Array(inputIds.map(id => BigInt(id)));
+                const inputTensor = new ort.Tensor('int64', inputArray, [1, 8]);
+                
+                const results = await session.run({ input_ids: inputTensor });
+                const logits = results.logits.data;
+                
+                const endTime = performance.now();
+                const inferenceTime = endTime - startTime;
+                
+                const lastPos = tokens.length - 1;
+                const vocabSize = Object.keys(vocab).length;
+                const startIdx = lastPos * vocabSize;
+                const positionLogits = Array.from(logits.slice(startIdx, startIdx + vocabSize));
+                
+                const maxLogit = Math.max(...positionLogits);
+                const expLogits = positionLogits.map(x => Math.exp(x - maxLogit));
+                const sumExp = expLogits.reduce((a, b) => a + b, 0);
+                const probs = expLogits.map(x => x / sumExp);
+                
+                const predictions = probs
+                    .map((prob, idx) => ({ token: idToToken[idx], prob, id: idx }))
+                    .filter(p => !['<PAD>', '<START>', '<UNK>'].includes(p.token))
+                    .sort((a, b) => b.prob - a.prob)
+                    .slice(0, 5);
+                
+                predictionsDiv.innerHTML = predictions.map(pred => `
+                    <div class="prediction">
+                        <div class="prediction-token">${pred.token}</div>
+                        <div class="prediction-bar">
+                            <div class="prediction-fill" style="width: ${pred.prob * 100}%"></div>
+                        </div>
+                        <div class="prediction-prob">${(pred.prob * 100).toFixed(1)}%</div>
+                    </div>
+                `).join('');
+                
+                timeDiv.textContent = `Inference: ${inferenceTime.toFixed(1)}ms`;
+                resultsSection.style.display = 'block';
+                
+            } catch (error) {
+                console.error('Prediction failed:', error);
+            } finally {
+                document.getElementById('predictButton').textContent = 'RUN INFERENCE';
+                document.getElementById('predictButton').disabled = false;
+            }
+        }
+        
+        document.getElementById('predictButton').disabled = true;
+        loadModel();
+    </script>
+</body>
+</html>
