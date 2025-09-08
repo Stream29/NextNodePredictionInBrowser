@@ -8,21 +8,21 @@ GitHub page: [https://stream29.github.io/NextNodePredictionInBrowser/index.html]
 
 ## Story: to Vibe a Transformer Model
 
-While doing an internship at [Dify](https://dify.ai), I found it inconvenient to edit a workflow, 
+During an internship at [Dify](https://dify.ai), I found it inconvenient to edit a workflow, 
 which is far from the experience of AI completion in code editors.
 
 Then I came up with this idea: Why not train a small model that can predict the next node in a workflow?
 This is a simple task, so we only need a small model.
 As the model is small enough, we can even run it in the browser.
 
-Transformer is not a new technology, and we have a bunch of libraries to build/run a Transformer model.
-So I made a bold decision: I would try to vibe a model.
-I cloned the [Awesome-Dify-Workflow](https://github.com/svcvit/Awesome-Dify-Workflow) repository to my workspace.
-Then I tell Claude Code to extract the node sequences from the Dify workflow DSL with a Python script.
-It was done well undoubtedly. I easily extract a dataset from a set of workflows.
-Then I told Claude Code to create a project with uv and train a Transformer model with the dataset.
-It did work, but the model is stored in memory and pytorch specific.
-So I told Claude Code to export the model to ONNX format and create a simple web page to run it in the browser.
+With the idea, I decided the process to vibe this model:
+
+- Create a directory as workspace and add `docs` subdirectory.
+- Clone the [Awesome-Dify-Workflow](https://github.com/svcvit/Awesome-Dify-Workflow) repository to my workspace.
+- Init the Python project with `uv`.
+- Extract the node sequences from the Dify workflow DSL with a Python script.
+- Train a Transformer model with the dataset with PyTorch.
+- Export the model to ONNX format and create a simple web page to run it in the browser with `ONNX.js`.
 
 All the steps above are done with telling Claude Code to write a report document in Markdown for context managing.
 Thus, I trained a small Transformer model to predict the next node in a Dify workflow that can be run in the browser, 
