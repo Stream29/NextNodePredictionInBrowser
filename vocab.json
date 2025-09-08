@@ -1,0 +1,29 @@
+{
+  "vocab": {
+    "<PAD>": 0,
+    "<START>": 1,
+    "<UNK>": 2,
+    "start": 3,
+    "llm": 4,
+    "agent": 5,
+    "answer": 6,
+    "end": 7,
+    "if-else": 8,
+    "variable": 9,
+    "code": 10
+  },
+  "vocab_size": 11,
+  "id_to_token": {
+    "0": "<PAD>",
+    "1": "<START>",
+    "2": "<UNK>",
+    "3": "start",
+    "4": "llm",
+    "5": "agent",
+    "6": "answer",
+    "7": "end",
+    "8": "if-else",
+    "9": "variable",
+    "10": "code"
+  }
+}
